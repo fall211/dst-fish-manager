@@ -1,0 +1,22 @@
+[Unit]
+Description=Don't Starve Together dedicated server (shard: %i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+KillSignal=SIGINT
+TimeoutStopSec=30s
+EnvironmentFile=%h/.config/dontstarve/config
+WorkingDirectory=%h
+
+ExecStartPre=/usr/bin/mkdir -p %h/.cache/dontstarve
+ExecStartPre=/bin/sh -c 'if [ ! -p %h/.cache/dontstarve/dst-%i.fifo ]; then mkfifo %h/.cache/dontstarve/dst-%i.fifo; fi'
+ExecStart=/bin/sh -c 'tail -f %h/.cache/dontstarve/dst-%i.fifo | %h/.local/bin/dst-server %i'
+ExecStopPost=/bin/rm -f %h/.cache/dontstarve/dst-%i.fifo
+Restart=on-failure
+RestartSec=10s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=dontstarve.target

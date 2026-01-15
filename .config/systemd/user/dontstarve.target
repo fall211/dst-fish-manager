@@ -1,0 +1,5 @@
+[Unit]
+Description=Don't Starve Together dedicated server target (group target)
+
+[Install]
+WantedBy=default.target

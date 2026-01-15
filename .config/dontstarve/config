@@ -1,0 +1,11 @@
+# Directory where Don't Starve Together is installed
+INSTALL_DIR="$HOME/dontstarvetogether_dedicated_server"
+
+# Directory where SteamCMD is installed
+STEAMCMD_DIR="$HOME/steamcmd"
+
+# The name of your cluster
+CLUSTER_NAME="MyDediServer"
+
+# Directory where Don't Starve Together configuration files are stored
+DONTSTARVE_DIR="$HOME/.klei/DoNotStarveTogether"
