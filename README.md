@@ -93,7 +93,6 @@ fish ~/.local/bin/dst-tui
 - **Linux**: systemd-based distribution (Ubuntu, Debian, Fedora, Arch)
 - **Fish Shell**: Required for installation scripts (recommended shell)
 - **Python 3.8+**: Core runtime environment
-- **systemd**: Service management system
 
 ### Installing Fish Shell
 
