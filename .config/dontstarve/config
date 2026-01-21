@@ -1,11 +1,15 @@
-# Directory where Don't Starve Together is installed
+# Cluster name (set to "auto" to auto-detect clusters):
+CLUSTER_NAME="auto"
+
+# Steam branch to use (main, beta)
+BRANCH="main"
+
+# DST install directory:
 INSTALL_DIR="$HOME/dontstarvetogether_dedicated_server"
 
-# Directory where SteamCMD is installed
+# SteamCMD directory:
 STEAMCMD_DIR="$HOME/steamcmd"
 
-# The name of your cluster
-CLUSTER_NAME="MyDediServer"
-
-# Directory where Don't Starve Together configuration files are stored
+# Saves:
 DONTSTARVE_DIR="$HOME/.klei/DoNotStarveTogether"
+DONTSTARVE_BETA_DIR="$HOME/.klei/DoNotStarveTogetherBetaBranch"

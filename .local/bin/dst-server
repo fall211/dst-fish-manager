@@ -24,6 +24,12 @@ set -q STEAMCMD_DIR; or set -gx STEAMCMD_DIR "$HOME/steamcmd"
 set -q INSTALL_DIR; or set -gx INSTALL_DIR "$HOME/dontstarvetogether_dedicated_server"
 set -q CLUSTER_NAME; or set -gx CLUSTER_NAME MyDediServer
 set -q DONTSTARVE_DIR; or set -gx DONTSTARVE_DIR "$HOME/.klei/DoNotStarveTogether"
+set -q DONTSTARVE_BETA_DIR; or set -gx DONTSTARVE_BETA_DIR "$HOME/.klei/DoNotStarveTogetherBetaBranch"
+
+# Handle beta branch - use beta saves directory
+if test "$BRANCH" = "beta"
+    set -gx DONTSTARVE_DIR "$DONTSTARVE_BETA_DIR"
+end
 
 function fail
     echo "Error: $argv" >&2
@@ -34,6 +40,16 @@ end
 test -f "$DONTSTARVE_DIR/$CLUSTER_NAME/cluster.ini"; or fail "Missing file: $DONTSTARVE_DIR/$CLUSTER_NAME/cluster.ini"
 test -f "$DONTSTARVE_DIR/$CLUSTER_NAME/cluster_token.txt"; or fail "Missing file: $DONTSTARVE_DIR/$CLUSTER_NAME/cluster_token.txt"
 test -d "$DONTSTARVE_DIR/$CLUSTER_NAME/$SHARD"; or fail "Missing directory: $DONTSTARVE_DIR/$CLUSTER_NAME/$SHARD"
+test -f "$DONTSTARVE_DIR/$CLUSTER_NAME/$SHARD/server.ini"; or fail "Missing file: $DONTSTARVE_DIR/$CLUSTER_NAME/$SHARD/server.ini"
+
+# Prevent multiple instances
+if test -f /tmp/dst-server-"$SHARD".pid
+    if kill -0 (cat /tmp/dst-server-"$SHARD".pid) 2>/dev/null
+        fail "Server for shard $SHARD is already running (PID: "(cat /tmp/dst-server-"$SHARD".pid)")"
+    end
+    rm -f /tmp/dst-server-"$SHARD".pid
+end
+echo $fish_pid > /tmp/dst-server-"$SHARD".pid
 
 # Find binary directory
 set -l BIN_DIR ""

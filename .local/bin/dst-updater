@@ -14,6 +14,7 @@ end
 # Default values
 set -q INSTALL_DIR; or set -gx INSTALL_DIR "$HOME/dontstarvetogether_dedicated_server"
 set -q STEAMCMD_DIR; or set -gx STEAMCMD_DIR "$HOME/steamcmd"
+set -q BRANCH; or set -gx BRANCH "main"
 set -l APP_ID 343050
 
 function fail
@@ -41,14 +42,31 @@ end
 if systemctl --user is-active --quiet dontstarve.target
     echo "Stopping dontstarve.target (user)"
     systemctl --user stop dontstarve.target
+    # Wait for services to actually stop
+    systemctl --user wait dontstarve.target --timeout=30
 end
 
 echo "Running steamcmd update..."
+echo "Using branch: $BRANCH"
+
+# Build steamcmd command with optional beta branch
+set -l STEAMCMD_CMD "$STEAMCMD_DIR/steamcmd.sh +force_install_dir $INSTALL_DIR +login anonymous +app_update $APP_ID"
+
+# Add branch parameter if not main
+if test "$BRANCH" != "main"
+    set STEAMCMD_CMD "$STEAMCMD_CMD -beta $BRANCH"
+end
+
+# Add quit parameter
+set STEAMCMD_CMD "$STEAMCMD_CMD +quit"
+
 # Note: we don't use 'validate' to avoid overwriting mods
-if "$STEAMCMD_DIR/steamcmd.sh" +force_install_dir "$INSTALL_DIR" +login anonymous +app_update "$APP_ID" +quit
+if eval $STEAMCMD_CMD
     echo "Update completed successfully."
+    exit 0
 else
     echo "An error occurred during update. Starting dontstarve.target to be safe." >&2
+    exit 1
 end
 
 # Restarting servers

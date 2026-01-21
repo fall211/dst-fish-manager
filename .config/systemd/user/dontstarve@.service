@@ -4,15 +4,22 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
+Type=exec
 KillSignal=SIGINT
 TimeoutStopSec=30s
-EnvironmentFile=%h/.config/dontstarve/config
+
+EnvironmentFile=-%h/.config/dontstarve/config
 WorkingDirectory=%h
 
 ExecStartPre=/usr/bin/mkdir -p %h/.cache/dontstarve
-ExecStartPre=/bin/sh -c 'if [ ! -p %h/.cache/dontstarve/dst-%i.fifo ]; then mkfifo %h/.cache/dontstarve/dst-%i.fifo; fi'
-ExecStart=/bin/sh -c 'tail -f %h/.cache/dontstarve/dst-%i.fifo | %h/.local/bin/dst-server %i'
+ExecStartPre=/bin/sh -c 'rm -f %h/.cache/dontstarve/dst-%i.fifo; mkfifo %h/.cache/dontstarve/dst-%i.fifo'
+
+# Using tail -f to keep standard input open for the server
+ExecStart=/bin/sh -c 'exec tail -f %h/.cache/dontstarve/dst-%i.fifo | %h/.local/bin/dst-server %i'
+
+ExecStop=/bin/sh -c 'if [ "%i" = "Master" ]; then echo "c_announce(\"Server will shut down.\")" > %h/.cache/dontstarve/dst-%i.fifo; sleep 5; fi'
+ExecStop=/bin/sh -c 'echo "c_shutdown()" > %h/.cache/dontstarve/dst-%i.fifo'
+
 ExecStopPost=/bin/rm -f %h/.cache/dontstarve/dst-%i.fifo
 Restart=on-failure
 RestartSec=10s
