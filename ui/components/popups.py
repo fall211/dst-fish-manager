@@ -172,16 +172,8 @@ class PopupManager:
                 line += " (auto)"
             win.addstr(i + 3, 2, line, color)
 
-        # Separator
-        sep_y = min(3 + len(clusters), h - 3)
-        if sep_y < h - 2:
-            win.addstr(sep_y, 1, "├")
-            win.addstr(sep_y, w - 1, "┤")
-            for x in range(2, w - 1):
-                win.addstr(sep_y, x, "─")
-
         # Branch selection
-        branch_y = sep_y + 1
+        branch_y = 3 + len(clusters) + 1
         if branch_y < h - 3:
             win.addstr(branch_y, 2, "Branch:", self.theme.pairs["default"])
             for i, branch in enumerate(branches[:3]):
