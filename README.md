@@ -25,7 +25,7 @@ fish --version
 # Install system dependencies if needed
 sudo apt install python3-curses fish # For Debian/Ubuntu
 sudo dnf install python3-curses fish # Fedora
-sudo pacmn -S python fish # Arch Linux and derivatives
+sudo pacman -S python fish # Arch Linux and derivatives
 
 ```
 
