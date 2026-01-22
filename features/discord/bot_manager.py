@@ -195,9 +195,18 @@ class DiscordBotManager:
             new_messages = []
             for msg in chat_logs:
                 if msg not in self.previous_chat_messages:
-                    # Filter out Discord messages to prevent echo loop
-                    if not msg.startswith("[Discord]"):
-                        new_messages.append(msg)
+                    # Filter out certain messages
+                    line = msg[12:]
+                    if line.startswith("[System Message] @"):
+                        continue
+                    if "[Discord]" in line:
+                        continue
+                    if line.startswith("[Whisper]"):
+                        continue
+                    if line.startswith("[Say]"):
+                        line = line[20:]
+
+                    new_messages.append(line)
 
             if new_messages:
                 discord_logger.info(f"Detected {len(new_messages)} new game chat message(s) to relay")
@@ -338,28 +347,17 @@ class DiscordClient(discord.Client):
         if (self.bot_manager.chat_channel_id and
             message.channel.id == int(self.bot_manager.chat_channel_id)):
 
-            discord_logger.info(f"Message received in chat channel from {message.author.display_name}, server_state={self.bot_manager.server_state.name}")
-
             if self.bot_manager.server_state == ServerState.STOPPED:
                 discord_logger.warning("Skipping message relay - server is stopped")
                 return
 
             # Remove emojis and format message
             msg = message.content
-            full_message = f"[Discord] {message.author.display_name}: {msg}"
+            full_message = f"@{message.author.display_name}: {msg}"
 
-            discord_logger.info(f"Relaying Discord message from {message.author.display_name}: {msg}")
+            discord_logger.info(f"Relaying Discord message from @{message.author.display_name}: {msg}")
 
-            # Send to all running shards
-            shards = self.bot_manager.manager_service.get_shards()
-            relay_count = 0
-            for shard in shards:
-                if shard.is_running:
-                    self.bot_manager.manager_service.send_chat_message(shard.name, full_message)
-                    relay_count += 1
-
-            discord_logger.info(f"Message relayed to {relay_count} running shard(s)")
-
+            self.bot_manager.manager_service.send_system_message(full_message)
 
 
 
@@ -398,8 +396,6 @@ class PanelMenu(discord.ui.View):
             discord_logger.info("Server startup command executed successfully")
             await interaction.followup.send("Server startup initiated...", ephemeral=True)
             self.bot_manager.server_state = ServerState.RUNNING
-            self.bot_manager.just_started = True
-            self.bot_manager.previous_chat_log_count = 0
         else:
             discord_logger.error(f"Server startup failed: {stderr}")
             await interaction.followup.send(f"Failed to start server: {stderr}", ephemeral=True)
@@ -424,8 +420,8 @@ class PanelMenu(discord.ui.View):
 
         # Announce shutdown
         discord_logger.info("Announcing server shutdown to players")
-        self.bot_manager.manager_service.send_chat_message(
-            "Master", "[Discord] Server is shutting down in 5 seconds."
+        self.bot_manager.manager_service.send_system_message(
+            "Server is shutting down in 5 seconds."
         )
         await asyncio.sleep(5)
 
@@ -462,8 +458,8 @@ class PanelMenu(discord.ui.View):
 
         # Announce restart
         discord_logger.info("Announcing server restart to players")
-        self.bot_manager.manager_service.send_chat_message(
-            "Master", "[Discord] Server is restarting in 5 seconds."
+        self.bot_manager.manager_service.send_system_message(
+            "Server is restarting in 5 seconds."
         )
         await asyncio.sleep(5)
 
@@ -477,8 +473,6 @@ class PanelMenu(discord.ui.View):
             await interaction.followup.send("Server restart initiated...", ephemeral=True)
             await asyncio.sleep(30)
             self.bot_manager.server_state = ServerState.RUNNING
-            self.bot_manager.just_started = True
-            self.bot_manager.previous_chat_log_count = 0
         else:
             discord_logger.error(f"Server restart failed: {stderr}")
             await interaction.followup.send(f"Failed to restart server: {stderr}", ephemeral=True)
