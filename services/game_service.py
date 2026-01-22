@@ -6,7 +6,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 from utils.config import HOME_DIR
 
