@@ -31,6 +31,7 @@ class UIState:
     selected_global_action_idx: int = -1  # -1 means not selected
     log_viewer_active: bool = False
     mods_viewer_active: bool = False
+    discord_logs_viewer_active: bool = False
     log_content: List[str] = field(default_factory=list)
     log_scroll_pos: int = 0
     mods: List[Dict[str, Any]] = field(default_factory=list)

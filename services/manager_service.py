@@ -91,12 +91,15 @@ class ManagerService:
         """Lazy initialization of Discord service."""
         if self._discord_service is None:
             from services.discord_service import DiscordService
+            print("Initializing Discord service...")
             self._discord_service = DiscordService(self)
         return self._discord_service
 
     def start_discord_bot(self):
         """Start the Discord bot if enabled."""
+        print("Starting Discord bot checking if it's enabled...")
         if self.discord_service.is_enabled():
+            print("Discord bot is enabled, starting")
             self.discord_service.start()
 
     def stop_discord_bot(self):

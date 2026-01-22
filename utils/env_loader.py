@@ -46,3 +46,4 @@ def load_env_file(env_file: str = ".env") -> None:
 
 # Auto-load on import
 load_env_file()
+load_env_file("key.env")  # Also load key.env for Discord configuration

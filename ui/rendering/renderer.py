@@ -319,6 +319,9 @@ class Renderer:
         if state.ui_state.mods_viewer_active:
             self._draw_mods_box(win)
             self._render_mods(win)
+        elif state.ui_state.discord_logs_viewer_active:
+            self._draw_logs_box(win, "DISCORD BOT LOGS [r: refresh]")
+            self._render_logs_pane(win)
         else:
             right_pane_title = (
                 "LOGS" if state.ui_state.log_viewer_active else "CHAT LOGS"
@@ -363,7 +366,7 @@ class Renderer:
         """Render logs or chat pane."""
         state = self.state_manager.state
 
-        if state.ui_state.log_viewer_active:
+        if state.ui_state.log_viewer_active or state.ui_state.discord_logs_viewer_active:
             lh, lw_box = win.getmaxyx()
             for i in range(1, lh - 1):
                 idx = state.ui_state.log_scroll_pos + i - 1
@@ -439,9 +442,11 @@ class Renderer:
 
         if state.ui_state.mods_viewer_active:
             footer = " ARROWS:NAV | ENTER:TOGGLE | A:ADD | M:BACK | Q:EXIT "
+        elif state.ui_state.discord_logs_viewer_active:
+            footer = " ARROWS:SCROLL | R:REFRESH | D/Q:BACK "
         else:
             footer = (
-                " ARROWS:NAV | ENTER:TOGGLE | S:SETTINGS | M:MODS | C:CHAT | Q:EXIT "
+                " ARROWS:NAV | ENTER:TOGGLE | S:SETTINGS | M:MODS | D:DISCORD | C:CHAT | Q:EXIT "
             )
 
         # Clear footer line with background color (only 1 line - h-1)
