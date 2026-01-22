@@ -1,4 +1,4 @@
-# DST Fish Manager 🐟
+# DST fish Manager 🐟
 
 ## FEATURES
 
