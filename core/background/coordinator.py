@@ -104,7 +104,7 @@ class BackgroundCoordinator:
             if current_time - state.last_status_refresh_time > 5.0:
                 from features.status.status_manager import StatusManager
 
-                new_status = StatusManager.get_server_status("Master")
+                new_status = StatusManager.get_server_status()
                 shards = self.state_manager.get_shards_copy()
                 master = next((s for s in shards if s.name == "Master"), None)
                 if master and master.is_running:
@@ -115,12 +115,12 @@ class BackgroundCoordinator:
                 self.state_manager.update_timing(last_status_refresh_time=current_time)
                 self.state_manager.request_redraw()
 
-            # Status poll request (every 30 seconds)
-            if current_time - state.last_status_poll_time > 30.0:
+            # Status poll request (every 15 seconds)
+            if current_time - state.last_status_poll_time > 15.0:
                 if not state.ui_state.log_viewer_active and not state.is_working:
                     from features.status.status_manager import StatusManager
 
-                    StatusManager.request_status_update("Master")
+                    StatusManager.request_status_update()
                 self.state_manager.update_timing(last_status_poll_time=current_time)
 
             # Chat logs refresh (every 5 seconds)

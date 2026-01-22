@@ -6,7 +6,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from utils.config import HOME_DIR
 
@@ -62,14 +62,14 @@ class GameService:
         return ChatManager.send_chat_message(shard_name, message)
 
     @staticmethod
-    def request_status_update(shard_name: str = "Master") -> bool:
+    def request_status_update(shard_name: Optional[str] = None) -> bool:
         """Sends Lua commands to the server to dump current status into the logs."""
         from features.status.status_manager import StatusManager
 
         return StatusManager.request_status_update(shard_name)
 
     @staticmethod
-    def get_server_status(shard_name: str = "Master") -> Dict:
+    def get_server_status(shard_name: Optional[str] = None) -> Dict:
         from features.status.status_manager import StatusManager
 
         return StatusManager.get_server_status(shard_name)

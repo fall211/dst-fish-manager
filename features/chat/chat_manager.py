@@ -52,8 +52,7 @@ class ChatManager:
     @staticmethod
     def send_command(shard_name: str, command: str) -> tuple[bool, str]:
         """Sends a command to the specified shard's console."""
-        if shard_name != "Master":
-            return False, "Commands can only be sent to the 'Master' shard."
+        # Allow commands to all shards (not just Master) for status polling
 
         fifo_path = HOME_DIR / ".cache" / "dontstarve" / f"dst-{shard_name}.fifo"
         if not fifo_path.exists():
