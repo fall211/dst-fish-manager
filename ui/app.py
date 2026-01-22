@@ -18,11 +18,11 @@ from ui.rendering.renderer import Renderer
 class TUIApp:
     """Main TUI application class."""
 
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, manager_service=None):
         self.stdscr = stdscr
         self.state_manager = StateManager()
         self.event_bus = EventBus()
-        self.manager_service = ManagerService()
+        self.manager_service = manager_service or ManagerService()
         self.mod_manager = ModManager()
 
         # Setup UI components
@@ -52,6 +52,10 @@ class TUIApp:
         # Setup event subscriptions
         self._setup_event_subscriptions()
 
+        # Connect event bus to Discord bot if running
+        if self.manager_service.discord_service.is_running:
+            self.manager_service.discord_service.set_event_bus(self.event_bus)
+
         # Initialize curses
         self._setup_curses()
 
@@ -73,6 +77,7 @@ class TUIApp:
         )
         self.input_handler.register_action_callback("prompt_chat", self._prompt_chat)
         self.input_handler.register_action_callback("open_mods", self._open_mods)
+        self.input_handler.register_action_callback("open_discord_logs", self._open_discord_logs)
         self.input_handler.register_action_callback("resize", self._handle_resize)
         self.input_handler.register_action_callback("toggle_mod", self._toggle_mod)
         self.input_handler.register_action_callback("add_mod", self._prompt_add_mod)
@@ -181,6 +186,57 @@ class TUIApp:
         self.state_manager.state.ui_state.mods_viewer_active = True
         self.state_manager.state.ui_state.selected_mod_idx = 0
 
+    def _set_log_viewer(self, log_content: list, is_discord: bool = False, scroll_to_bottom: bool = False) -> None:
+        """Set log viewer content and activate it.
+
+        Args:
+            log_content: List of log lines to display
+            is_discord: True if Discord logs, False for system logs
+            scroll_to_bottom: If True, scroll to show most recent logs
+        """
+        self.state_manager.state.ui_state.log_content = log_content
+        self.state_manager.state.ui_state.discord_logs_viewer_active = is_discord
+        self.state_manager.state.ui_state.log_viewer_active = not is_discord
+
+        if scroll_to_bottom:
+            self.state_manager.state.ui_state.log_scroll_pos = max(0, len(log_content) - 20)
+        else:
+            self.state_manager.state.ui_state.log_scroll_pos = 0
+
+    def _open_discord_logs(self) -> None:
+        """Open Discord bot logs viewer."""
+        from utils.logger import discord_logger
+        from pathlib import Path
+
+        # Read from the actual log file
+        log_file_path = discord_logger.get_log_file_path()
+        log_content = []
+
+        if log_file_path and Path(log_file_path).exists():
+            try:
+                with open(log_file_path, 'r') as f:
+                    # Read all lines and take last 500
+                    lines = f.readlines()
+                    log_content = [line.rstrip('\n') for line in lines[-500:]]
+            except Exception as e:
+                log_content = [f"Error reading log file: {e}"]
+
+        if not log_content:
+            log_content = [
+                "No Discord bot logs available yet.",
+                "",
+                "The Discord bot will log activity here including:",
+                "  - Bot startup and initialization",
+                "  - Command executions",
+                "  - Server control operations",
+                "  - Chat activity detection",
+                "  - Errors and warnings",
+                "",
+                f"Log file: {log_file_path or 'Not configured'}"
+            ]
+
+        self._set_log_viewer(log_content, is_discord=True, scroll_to_bottom=True)
+
     def _handle_resize(self) -> None:
         """Handle terminal resize."""
         self.stdscr.clear()
@@ -215,9 +271,7 @@ class TUIApp:
 
     def _handle_update(self) -> None:
         """Handle server update."""
-        self.state_manager.state.ui_state.log_content = ["--- Starting Update ---"]
-        self.state_manager.state.ui_state.log_viewer_active = True
-        self.state_manager.state.ui_state.log_scroll_pos = 0
+        self._set_log_viewer(["--- Starting Update ---"], is_discord=False)
 
         def update_worker():
             try:
@@ -259,9 +313,7 @@ class TUIApp:
     def _handle_logs(self, shard_name: str) -> None:
         """Handle viewing logs."""
         log_content = self.manager_service.get_logs(shard_name, lines=200).split("\n")
-        self.state_manager.state.ui_state.log_content = log_content
-        self.state_manager.state.ui_state.log_viewer_active = True
-        self.state_manager.state.ui_state.log_scroll_pos = 0
+        self._set_log_viewer(log_content, is_discord=False)
 
     def _on_shard_refresh(self, event: Event) -> None:
         """Handle shard refresh event."""
@@ -281,10 +333,10 @@ class TUIApp:
         pass
 
 
-def main(stdscr):
+def main(stdscr, manager_service=None):
     """Main entry point."""
     try:
-        app = TUIApp(stdscr)
+        app = TUIApp(stdscr, manager_service)
         app.run()
     except Exception as e:
         # Cleanup and show error
