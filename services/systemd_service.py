@@ -3,6 +3,7 @@
 
 """SystemD service for managing DST shards."""
 
+import shutil
 import subprocess
 from typing import List, Set, Tuple
 
@@ -16,8 +17,13 @@ class SystemDService:
     def _run_systemctl_command(args: list[str]) -> Tuple[bool, str, str]:
         """Runs a systemctl command and returns success, stdout, and stderr."""
         try:
+            systemctl_path = shutil.which("systemctl")
+            if not systemctl_path:
+                return False, "", "systemctl command not found."
+            # nosemgrep: gitlab.security.b603
+            # Safe subprocess call: uses list argument, validated executable path, no shell=True
             process = subprocess.run(
-                ["systemctl", "--user", *args],
+                [systemctl_path, "--user", *args],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -96,9 +102,14 @@ class SystemDService:
         """Gets the latest journalctl logs for a shard."""
         unit_name = f"{UNIT_PREFIX}{shard_name}{UNIT_SUFFIX}"
         try:
+            journalctl_path = shutil.which("journalctl")
+            if not journalctl_path:
+                return "journalctl command not found."
+            # nosemgrep: gitlab.security.b603
+            # Safe subprocess call: uses list argument, validated executable path, no shell=True
             process = subprocess.run(
                 [
-                    "journalctl",
+                    journalctl_path,
                     "--user",
                     "-u",
                     unit_name,

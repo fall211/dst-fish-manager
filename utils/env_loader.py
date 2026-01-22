@@ -20,17 +20,17 @@ def load_env_file(env_file: str = ".env") -> None:
     if not env_path.exists():
         return
 
-    with open(env_path, 'r') as f:
+    with open(env_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
 
             # Skip empty lines and comments
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
             # Parse KEY=VALUE format
-            if '=' in line:
-                key, value = line.split('=', 1)
+            if "=" in line:
+                key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip()
 

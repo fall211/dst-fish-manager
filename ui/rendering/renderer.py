@@ -4,16 +4,31 @@
 """Main renderer for the TUI."""
 
 import curses
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from core.state.app_state import StateManager
-from ui.components.windows import WindowManager
 from ui.components.popups import PopupManager
-from ui.rendering.themes import Theme, BoxChars
+from ui.components.windows import WindowManager
+from ui.rendering.themes import BoxChars, Theme
 from utils.helpers import truncate_string
 
 if TYPE_CHECKING:
     from ui.app import TUIApp
+
+
+# Emoji constants for status display
+SEASON_EMOJIS = {
+    "autumn": "🍂",
+    "winter": "❄️",
+    "spring": "🌱",
+    "summer": "☀️",
+}
+
+PHASE_EMOJIS = {
+    "day": "☀️",
+    "dusk": "🌆",
+    "night": "🌙",
+}
 
 
 class Renderer:
@@ -36,8 +51,6 @@ class Renderer:
 
     def render(self) -> None:
         """Main render method."""
-        state = self.state_manager.state
-
         # Check minimum terminal size
         h, w = self.stdscr.getmaxyx()
         if h < 12 or w < 40:
@@ -91,7 +104,7 @@ class Renderer:
     def _render_header(self, w: int) -> None:
         """Render the header."""
         state = self.state_manager.state
-        title = "DST FISH MANAGER"
+        title = "DST FISH MANAGER | F10: Toggle Discord Bot"
         if state.is_working:
             title += " [WAITING...]"
 
@@ -125,18 +138,9 @@ class Renderer:
         state = self.state_manager.state
         status = state.server_status
 
-        # Emoji mappings
-        season_emojis = {
-            "autumn": "🍂",
-            "winter": "❄️",
-            "spring": "🌱",
-            "summer": "☀️",
-        }
-        phase_emojis = {
-            "day": "☀️",
-            "dusk": "🌆",
-            "night": "🌙",
-        }
+        # Use global emoji constants
+        season_emojis = SEASON_EMOJIS
+        phase_emojis = PHASE_EMOJIS
 
         # Clear content area with proper width
         for y in range(1, h - 1):
@@ -153,12 +157,20 @@ class Renderer:
             p_emoji = phase_emojis.get(phase.lower(), "❓")
 
             # Line 1: Season: Emoji | Day: ...
-            line1 = f"Season: {s_emoji} | Day: {status.day}"
-            if w > len(line1) + 4:
-                line1 += f" ({status.days_left} left)"
+            season_info = f"{s_emoji}" if season != "---" else "Unknown"
+            day_info = status.day if status.day != "---" else "Unknown"
+            days_left_info = (
+                f"({status.days_left} left)" if status.days_left != "---" else ""
+            )
+
+            line1 = f"Season: {season_info} | Day: {day_info}"
+            if w > len(line1) + 4 and days_left_info:
+                line1 += f" {days_left_info}"
 
             # Line 2: Phase: Emoji | Players: X
-            line2 = f"Phase: {p_emoji} | Players: {len(status.players)}"
+            phase_info = f"{p_emoji}" if phase != "---" else "Unknown"
+            players_count = len(status.players) if status.players else 0
+            line2 = f"Phase: {phase_info} | Players: {players_count}"
 
             win.addstr(1, 2, truncate_string(line1, w - 4), self.theme.pairs["default"])
             if h >= 3:
@@ -174,7 +186,10 @@ class Renderer:
                         i == max_players_to_show - 1
                         and len(status.players) == max_players_to_show
                     ):
-                        p_line = f"  {p['name']} - {p['char']}"
+                        # Handle case where 'char' field might not exist
+                        player_char = p.get("char", "Unknown")
+                        player_name = p.get("name", "Unknown")
+                        p_line = f"  {player_name} - {player_char}"
                         try:
                             win.addstr(
                                 3 + i,
@@ -193,6 +208,9 @@ class Renderer:
                             self.theme.pairs["default"],
                         )
                         break
+            elif h > 4:
+                # Show message when no players are online
+                win.addstr(3, 2, "  No players online", self.theme.pairs["default"])
 
         except curses.error:
             pass
@@ -366,7 +384,10 @@ class Renderer:
         """Render logs or chat pane."""
         state = self.state_manager.state
 
-        if state.ui_state.log_viewer_active or state.ui_state.discord_logs_viewer_active:
+        if (
+            state.ui_state.log_viewer_active
+            or state.ui_state.discord_logs_viewer_active
+        ):
             lh, lw_box = win.getmaxyx()
             for i in range(1, lh - 1):
                 idx = state.ui_state.log_scroll_pos + i - 1
@@ -390,7 +411,17 @@ class Renderer:
                         y = i + 1
                         if line and len(line) > available_width:
                             line = truncate_string(line, available_width - 3) + "..."
-                        win.addstr(y, 1, line, self.theme.pairs["default"])
+
+                        # Use different colors for different message sources
+                        if line.startswith("[Discord]"):
+                            # Discord messages in blue
+                            win.addstr(y, 1, line, self.theme.pairs["discord"])
+                        elif line.startswith("[Game Chat]"):
+                            # Game messages in green
+                            win.addstr(y, 1, line, self.theme.pairs["game_chat"])
+                        else:
+                            # Regular messages in default color
+                            win.addstr(y, 1, line, self.theme.pairs["default"])
                     except curses.error:
                         pass
             else:
@@ -445,9 +476,7 @@ class Renderer:
         elif state.ui_state.discord_logs_viewer_active:
             footer = " ARROWS:SCROLL | R:REFRESH | D/Q:BACK "
         else:
-            footer = (
-                " ARROWS:NAV | ENTER:TOGGLE | S:SETTINGS | M:MODS | D:DISCORD | C:CHAT | Q:EXIT "
-            )
+            footer = " ARROWS:NAV | ENTER:TOGGLE | S:SETTINGS | M:MODS | D:DISCORD | C:CHAT | Q:EXIT "
 
         # Clear footer line with background color (only 1 line - h-1)
         try:

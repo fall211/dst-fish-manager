@@ -7,6 +7,7 @@ import curses
 import curses.textpad
 from typing import Optional, Tuple
 
+from features.cluster.cluster_manager import BranchManager, ClusterManager  # noqa: C0415
 from ui.rendering.themes import BoxChars
 
 
@@ -53,10 +54,10 @@ class PopupManager:
                 return ch
 
             # Edit with escape support
-            result = box.edit(validate)
+            box.edit(validate)
             text = box.gather().strip()
             return text if text else None
-        except:
+        except (curses.error, RuntimeError):  # noqa: BLE001
             return None
         finally:
             # Always restore settings
@@ -65,8 +66,6 @@ class PopupManager:
 
     def settings_popup(self) -> Optional[Tuple[str, str]]:
         """Create a settings popup for cluster and branch selection."""
-        from features.cluster.cluster_manager import BranchManager, ClusterManager
-
         cluster_manager = ClusterManager()
         branch_manager = BranchManager()
 
@@ -110,19 +109,19 @@ class PopupManager:
 
                 if key in [ord("q"), 27, ord("s")]:  # Close
                     return None
-                elif key == curses.KEY_UP:
+                if key == curses.KEY_UP:
                     selected_cluster_idx = max(0, selected_cluster_idx - 1)
-                elif key == curses.KEY_DOWN:
+                if key == curses.KEY_DOWN:
                     selected_cluster_idx = min(
                         len(available_clusters) - 1, selected_cluster_idx + 1
                     )
-                elif key == curses.KEY_LEFT:
+                if key == curses.KEY_LEFT:
                     selected_branch_idx = max(0, selected_branch_idx - 1)
-                elif key == curses.KEY_RIGHT:
+                if key == curses.KEY_RIGHT:
                     selected_branch_idx = min(
                         len(available_branches) - 1, selected_branch_idx + 1
                     )
-                elif key == ord("\n"):  # Apply
+                if key == ord("\n"):  # Apply
                     new_cluster = available_clusters[selected_cluster_idx]
                     new_branch = available_branches[selected_branch_idx]
 
@@ -131,8 +130,7 @@ class PopupManager:
 
                     if cluster_success and branch_success:
                         return (new_cluster, new_branch)
-                    else:
-                        return None
+                    return None
         finally:
             self.stdscr.nodelay(1)
 
@@ -192,37 +190,8 @@ class PopupManager:
 
     def _draw_popup_box(self, win: curses.window, title: str) -> None:
         """Draw a box around the popup window."""
-        try:
-            h, w = win.getmaxyx()
-            if h < 2 or w < 2:
-                return
+        from ui.rendering.themes import BoxChars  # noqa: C0415
 
-            chars = self.box_chars.chars
-
-            # Draw corners
-            win.addstr(0, 0, chars["tl"])
-            win.addstr(0, w - 1, chars["tr"])
-            win.addstr(h - 1, 0, chars["bl"])
-            try:
-                win.addstr(h - 1, w - 1, chars["br"])
-            except curses.error:
-                try:
-                    win.insstr(h - 1, w - 1, chars["br"])
-                except curses.error:
-                    pass
-
-            # Draw lines
-            for x in range(1, w - 1):
-                win.addstr(0, x, chars["h"])
-                win.addstr(h - 1, x, chars["h"])
-            for y in range(1, h - 1):
-                win.addstr(y, 0, chars["v"])
-                win.addstr(y, w - 1, chars["v"])
-
-            # Draw title
-            if title and w > len(title) + 4:
-                win.addstr(
-                    0, 2, f" {title} ", self.theme.pairs["title"] | curses.A_BOLD
-                )
-        except curses.error:
-            pass
+        BoxChars.draw_box_with_title(
+            win, self.box_chars, self.theme, title, use_border_attr=False
+        )

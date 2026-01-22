@@ -3,9 +3,9 @@
 
 """Application state management."""
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any
 import threading
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Set
 
 from utils.config import Shard
 
@@ -36,6 +36,7 @@ class UIState:
     log_scroll_pos: int = 0
     mods: List[Dict[str, Any]] = field(default_factory=list)
     cached_chat_logs: List[str] = field(default_factory=list)
+    seen_chat_messages: Set[str] = field(default_factory=set)
 
 
 @dataclass

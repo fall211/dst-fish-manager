@@ -4,15 +4,17 @@
 """Main TUI application."""
 
 import curses
+import subprocess
 import time
 
 from core.background.coordinator import BackgroundCoordinator
-from core.events.bus import EventBus, Event, EventType
+from core.events.bus import Event, EventBus, EventType
 from core.state.app_state import StateManager
 from features.mods.mod_manager import ModManager
 from services.manager_service import ManagerService
-from ui.input.handler import EnhancedInputHandler
+from ui.input.handler import InputHandler
 from ui.rendering.renderer import Renderer
+from utils.logger import discord_logger
 
 
 class TUIApp:
@@ -29,7 +31,7 @@ class TUIApp:
         self.renderer = Renderer(stdscr, self.state_manager)
 
         # Setup input handler after renderer is created
-        self.input_handler = EnhancedInputHandler(
+        self.input_handler = InputHandler(
             self.state_manager,
             self.event_bus,
             self.renderer.theme,
@@ -52,9 +54,16 @@ class TUIApp:
         # Setup event subscriptions
         self._setup_event_subscriptions()
 
-        # Connect event bus to Discord bot if running
-        if self.manager_service.discord_service.is_running:
-            self.manager_service.discord_service.set_event_bus(self.event_bus)
+        # Connect event bus to Discord bot if enabled and running
+        try:
+            if (
+                self.manager_service.discord_service.is_enabled()
+                and self.manager_service.discord_service.is_running
+            ):
+                self.manager_service.discord_service.set_event_bus(self.event_bus)
+        except AttributeError:
+            # Discord service not available or not properly initialized
+            pass
 
         # Initialize curses
         self._setup_curses()
@@ -77,10 +86,15 @@ class TUIApp:
         )
         self.input_handler.register_action_callback("prompt_chat", self._prompt_chat)
         self.input_handler.register_action_callback("open_mods", self._open_mods)
-        self.input_handler.register_action_callback("open_discord_logs", self._open_discord_logs)
+        self.input_handler.register_action_callback(
+            "open_discord_logs", self._open_discord_logs
+        )
         self.input_handler.register_action_callback("resize", self._handle_resize)
         self.input_handler.register_action_callback("toggle_mod", self._toggle_mod)
         self.input_handler.register_action_callback("add_mod", self._prompt_add_mod)
+        self.input_handler.register_action_callback(
+            "toggle_discord", self._toggle_discord_bot
+        )
 
     def _setup_event_subscriptions(self) -> None:
         """Setup event bus subscriptions."""
@@ -174,8 +188,12 @@ class TUIApp:
         """Prompt for chat message."""
         message = self.renderer.popup_manager.text_input_popup("Chat:", width=60)
         if message:
+            # Send message to game and publish event for Discord forwarding
             success, _ = self.manager_service.send_chat_message("Master", message)
-            if not success:
+            if success:
+                # Publish chat message event with prefix for Discord to pick up
+                self.event_bus.publish(Event(EventType.CHAT_MESSAGE, [message]))
+            else:
                 # Could show error popup here
                 pass
 
@@ -186,7 +204,12 @@ class TUIApp:
         self.state_manager.state.ui_state.mods_viewer_active = True
         self.state_manager.state.ui_state.selected_mod_idx = 0
 
-    def _set_log_viewer(self, log_content: list, is_discord: bool = False, scroll_to_bottom: bool = False) -> None:
+    def _set_log_viewer(
+        self,
+        log_content: list,
+        is_discord: bool = False,
+        scroll_to_bottom: bool = False,
+    ) -> None:
         """Set log viewer content and activate it.
 
         Args:
@@ -199,41 +222,18 @@ class TUIApp:
         self.state_manager.state.ui_state.log_viewer_active = not is_discord
 
         if scroll_to_bottom:
-            self.state_manager.state.ui_state.log_scroll_pos = max(0, len(log_content) - 20)
+            self.state_manager.state.ui_state.log_scroll_pos = max(
+                0, len(log_content) - 20
+            )
         else:
             self.state_manager.state.ui_state.log_scroll_pos = 0
 
     def _open_discord_logs(self) -> None:
         """Open Discord bot logs viewer."""
-        from utils.logger import discord_logger
-        from pathlib import Path
-
-        # Read from the actual log file
-        log_file_path = discord_logger.get_log_file_path()
-        log_content = []
-
-        if log_file_path and Path(log_file_path).exists():
-            try:
-                with open(log_file_path, 'r') as f:
-                    # Read all lines and take last 500
-                    lines = f.readlines()
-                    log_content = [line.rstrip('\n') for line in lines[-500:]]
-            except Exception as e:
-                log_content = [f"Error reading log file: {e}"]
-
-        if not log_content:
-            log_content = [
-                "No Discord bot logs available yet.",
-                "",
-                "The Discord bot will log activity here including:",
-                "  - Bot startup and initialization",
-                "  - Command executions",
-                "  - Server control operations",
-                "  - Chat activity detection",
-                "  - Errors and warnings",
-                "",
-                f"Log file: {log_file_path or 'Not configured'}"
-            ]
+        try:
+            log_content = discord_logger.get_log_file_content(max_lines=500)
+        except (ImportError, AttributeError):
+            log_content = ["Discord logging not available"]
 
         self._set_log_viewer(log_content, is_discord=True, scroll_to_bottom=True)
 
@@ -241,6 +241,38 @@ class TUIApp:
         """Handle terminal resize."""
         self.stdscr.clear()
         self.renderer.window_manager.create_layout()
+
+    def _toggle_discord_bot(self) -> None:
+        """Toggle Discord bot on/off via F10."""
+        try:
+            discord_service = self.manager_service.discord_service
+
+            if discord_service.is_running:
+                discord_service.stop()
+                self._set_log_viewer(
+                    ["--- Discord Bot Stopped ---"],
+                    is_discord=False,
+                    scroll_to_bottom=True,
+                )
+            else:
+                discord_service.start()
+                self._set_log_viewer(
+                    ["--- Discord Bot Started ---"],
+                    is_discord=False,
+                    scroll_to_bottom=True,
+                )
+        except AttributeError:
+            self._set_log_viewer(
+                ["--- Discord Service Not Available ---"],
+                is_discord=False,
+                scroll_to_bottom=True,
+            )
+        except (RuntimeError, OSError) as e:
+            self._set_log_viewer(
+                [f"--- Error Toggling Discord Bot: {e} ---"],
+                is_discord=False,
+                scroll_to_bottom=True,
+            )
 
     def _toggle_mod(self) -> None:
         """Toggle mod enabled state."""
@@ -303,7 +335,7 @@ class TUIApp:
                 self.state_manager.state.ui_state.log_content.append(
                     "--- Update Complete ---"
                 )
-            except Exception as e:
+            except (OSError, subprocess.SubprocessError) as e:
                 self.state_manager.state.ui_state.log_content.append(
                     f"Error during update: {e}"
                 )
@@ -315,22 +347,28 @@ class TUIApp:
         log_content = self.manager_service.get_logs(shard_name, lines=200).split("\n")
         self._set_log_viewer(log_content, is_discord=False)
 
-    def _on_shard_refresh(self, event: Event) -> None:
+    def _on_shard_refresh(self, _event: Event) -> None:
         """Handle shard refresh event."""
         self.state_manager.request_redraw()
 
-    def _on_status_update(self, event: Event) -> None:
+    def _on_status_update(self, _event: Event) -> None:
         """Handle server status update event."""
         self.state_manager.request_redraw()
 
     def _on_chat_message(self, event: Event) -> None:
         """Handle chat message event."""
+        chat_logs = event.data
+        if chat_logs and isinstance(chat_logs, list):
+            # The coordinator already handles deduplication and adds new messages
+            # to state.ui_state.cached_chat_logs, so we don't need to add them again here
+            # Just request a redraw to show the updated chat logs
+            pass
         self.state_manager.request_redraw()
 
-    def _on_exit_requested(self, event: Event) -> None:
+    def _on_exit_requested(self, _event: Event) -> None:
         """Handle exit requested event."""
         # This will be handled in the main loop
-        pass
+        pass  # noqa: W0107
 
 
 def main(stdscr, manager_service=None):
@@ -338,14 +376,5 @@ def main(stdscr, manager_service=None):
     try:
         app = TUIApp(stdscr, manager_service)
         app.run()
-    except Exception as e:
-        # Cleanup and show error
-        curses.endwin()
-        print(f"An error occurred: {e}")
-
-
-if __name__ == "__main__":
-    try:
-        curses.wrapper(main)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass

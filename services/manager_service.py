@@ -8,6 +8,9 @@ import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict
 
+from features.chat.chat_manager import ChatManager
+from features.status.status_manager import StatusManager
+from services.discord_service import DiscordService
 from services.systemd_service import SystemDService
 from features.shards.shard_manager import ShardManager
 from utils.config import Shard, HOME_DIR
@@ -57,8 +60,6 @@ class ManagerService:
 
     def get_chat_logs(self, lines: int = 50) -> List[str]:
         """Gets the latest chat messages from the game chat log."""
-        from features.chat.chat_manager import ChatManager
-
         return ChatManager.get_chat_logs(lines)
 
     def run_updater(self):
@@ -79,6 +80,8 @@ class ManagerService:
                 f"Updater script not found in any of: {possible_paths}"
             )
 
+        # nosemgrep: gitlab.security.b603
+        # Safe subprocess call: uses list argument, validated executable path, no shell=True
         return subprocess.Popen(
             [str(updater_path)],
             stdout=subprocess.PIPE,
@@ -88,39 +91,28 @@ class ManagerService:
 
     def send_command(self, shard_name: str, command: str) -> Tuple[bool, str]:
         """Sends a command to the specified shard's console."""
-        from features.chat.chat_manager import ChatManager
-
         return ChatManager.send_command(shard_name, command)
 
     def send_chat_message(self, shard_name: str, message: str) -> Tuple[bool, str]:
         """Sends a chat message using c_announce() command."""
-        from features.chat.chat_manager import ChatManager
-
         return ChatManager.send_chat_message(shard_name, message)
 
     def send_system_message(self, message: str) -> Tuple[bool, str]:
         """Sends a chat message using TheNet:SystemMessage command."""
-        from features.chat.chat_manager import ChatManager
-
         return ChatManager.send_system_message("Master", message)
 
     def get_server_status(self, shard_name: str = "Master") -> Dict:
         """Gets server status information."""
-        from features.status.status_manager import StatusManager
-
         return StatusManager.get_server_status(shard_name)
 
     def request_status_update(self, shard_name: str = "Master") -> bool:
         """Requests status update from server."""
-        from features.status.status_manager import StatusManager
-
         return StatusManager.request_status_update(shard_name)
 
     @property
     def discord_service(self):
         """Lazy initialization of Discord service."""
         if self._discord_service is None:
-            from services.discord_service import DiscordService
             self._discord_service = DiscordService(self)
         return self._discord_service
 

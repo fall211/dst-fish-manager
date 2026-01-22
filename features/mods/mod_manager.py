@@ -74,11 +74,9 @@ class ModManager:
             name_match = re.search(r'name\s*=\s*"(.*?)"', content)
             if name_match:
                 return name_match.group(1)
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             logging.getLogger(__name__).debug(
-                "Failed to read mod info from %s: %s", 
-                info_path, 
-                e
+                "Failed to read mod info from %s: %s", info_path, e
             )
         return workshop_id
 

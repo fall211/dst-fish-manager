@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Enhanced input handler with settings support."""
+"""Input handler with settings support."""
 
 import curses
-from typing import TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from core.events.bus import Event, EventBus, EventType
 from core.state.app_state import StateManager
@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     pass
 
 
-class EnhancedInputHandler:
-    """Enhanced input handler with settings support."""
+class InputHandler:
+    """Input handler with settings support."""
 
     def __init__(
         self, state_manager: StateManager, event_bus: EventBus, theme, popup_manager
@@ -26,7 +26,7 @@ class EnhancedInputHandler:
         self.popup_manager = popup_manager
 
         self.action_callbacks = {}
-        self._app = None  # type: Optional[Any]  # Back-reference to app
+        self._app: Optional[Any] = None  # Back-reference to app
         self._setup_keymap()
 
     def _setup_keymap(self):
@@ -48,6 +48,7 @@ class EnhancedInputHandler:
             27: self._handle_quit,  # Esc
             # Special
             curses.KEY_RESIZE: self._handle_resize,
+            curses.KEY_F10: self._handle_discord_toggle,  # F10 - Toggle Discord bot
         }
 
     def register_action_callback(self, action: str, callback) -> None:
@@ -59,7 +60,6 @@ class EnhancedInputHandler:
         Process all pending input.
         Returns True if exit requested, False otherwise.
         """
-        input_received = False
         state = self.state_manager.state
 
         while True:
@@ -67,7 +67,6 @@ class EnhancedInputHandler:
             if key == -1:
                 break
 
-            input_received = True
             self.state_manager.request_redraw()
 
             # Handle special modes
@@ -222,10 +221,10 @@ class EnhancedInputHandler:
                 max_scroll, state.ui_state.log_scroll_pos + 1
             )
             return True
-        elif key == curses.KEY_UP:
+        if key == curses.KEY_UP:
             state.ui_state.log_scroll_pos = max(0, state.ui_state.log_scroll_pos - 1)
             return True
-        elif key == curses.KEY_LEFT:
+        if key == curses.KEY_LEFT:
             state.ui_state.log_viewer_active = False
             return True
         return False
@@ -239,31 +238,17 @@ class EnhancedInputHandler:
                 max_scroll, state.ui_state.log_scroll_pos + 1
             )
             return True
-        elif key == curses.KEY_UP:
+        if key == curses.KEY_UP:
             state.ui_state.log_scroll_pos = max(0, state.ui_state.log_scroll_pos - 1)
             return True
-        elif key in [ord("q"), 27, ord("d"), curses.KEY_LEFT]:
+        if key in [ord("q"), 27, ord("d"), curses.KEY_LEFT]:
             state.ui_state.discord_logs_viewer_active = False
             return True
-        elif key == ord("r"):
+        if key == ord("r"):
             # Refresh Discord logs from file
-            from utils.logger import discord_logger
-            from pathlib import Path
+            from utils.logger import discord_logger  # noqa: C0415
 
-            log_file_path = discord_logger.get_log_file_path()
-            log_content = []
-
-            if log_file_path and Path(log_file_path).exists():
-                try:
-                    with open(log_file_path, 'r') as f:
-                        lines = f.readlines()
-                        log_content = [line.rstrip('\n') for line in lines[-500:]]
-                except Exception as e:
-                    log_content = [f"Error reading log file: {e}"]
-
-            if not log_content:
-                log_content = ["No Discord bot logs available yet."]
-
+            log_content = discord_logger.get_log_file_content(max_lines=500)
             state.ui_state.log_content = log_content
             state.ui_state.log_scroll_pos = max(0, len(log_content) - 20)
             return True
@@ -277,23 +262,30 @@ class EnhancedInputHandler:
                 0, state.ui_state.selected_mod_idx - 1
             )
             return True
-        elif key == curses.KEY_DOWN:
+        if key == curses.KEY_DOWN:
             if state.ui_state.mods:
                 state.ui_state.selected_mod_idx = min(
                     len(state.ui_state.mods) - 1, state.ui_state.selected_mod_idx + 1
                 )
             return True
-        elif key == ord("\n"):
+        if key == ord("\n"):
             callback = self.action_callbacks.get("toggle_mod")
             if callback:
                 callback()
             return True
-        elif key == ord("a"):
+        if key == ord("a"):
             callback = self.action_callbacks.get("add_mod")
             if callback:
                 callback()
             return True
-        elif key in [ord("q"), 27, ord("m"), curses.KEY_LEFT]:
+        if key in [ord("q"), 27, ord("m"), curses.KEY_LEFT]:
             state.ui_state.mods_viewer_active = False
             return True
         return False
+
+    def _handle_discord_toggle(self, stdscr, key) -> bool:
+        """Handle F10 - Toggle Discord bot on/off."""
+        callback = self.action_callbacks.get("toggle_discord")
+        if callback:
+            callback()
+        return True
