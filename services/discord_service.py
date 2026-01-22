@@ -7,6 +7,7 @@ import threading
 from typing import Optional
 
 from features.discord.bot_manager import DiscordBotManager
+from utils.logger import discord_logger
 
 
 class DiscordService:
@@ -28,9 +29,11 @@ class DiscordService:
     def start(self):
         """Start the Discord bot in a background thread."""
         if self.is_running:
+            discord_logger.warning("Discord bot is already running")
             return
 
         try:
+            discord_logger.info("Starting Discord service")
             self.bot_manager = DiscordBotManager(self.manager_service)
 
             # Start bot in background thread
@@ -41,8 +44,12 @@ class DiscordService:
             )
             self.bot_thread.start()
             self.is_running = True
+            discord_logger.info("Discord service started successfully")
 
         except Exception as e:
+            discord_logger.error(f"Failed to start Discord service: {e}")
+            import traceback
+            traceback.print_exc()
             raise
 
     def stop(self):
@@ -51,16 +58,13 @@ class DiscordService:
             return
 
         try:
-            if self.bot_manager:
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(self.bot_manager.stop())
-                loop.close()
-
+            discord_logger.info("Stopping Discord service")
+            # Since the bot runs in a daemon thread, it will be killed when the main process exits
+            # No need to explicitly close the Discord client - it causes event loop conflicts
             self.is_running = False
+            discord_logger.info("Discord service stopped (daemon thread will terminate)")
         except Exception as e:
-            pass
+            discord_logger.error(f"Error stopping Discord service: {e}")
 
     def is_enabled(self) -> bool:
         """Check if Discord integration is enabled."""

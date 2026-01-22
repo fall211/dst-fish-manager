@@ -28,7 +28,10 @@ if __name__ == "__main__":
 
     try:
         # Start Discord bot in background if enabled
-        manager_service.start_discord_bot()
+        if manager_service.discord_service.is_enabled():
+            manager_service.start_discord_bot()
+        else:
+            print("Discord bot is not enabled (no token found)")
 
         # Run the TUI application
         curses.wrapper(lambda stdscr: main(stdscr, manager_service))

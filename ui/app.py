@@ -73,6 +73,7 @@ class TUIApp:
         )
         self.input_handler.register_action_callback("prompt_chat", self._prompt_chat)
         self.input_handler.register_action_callback("open_mods", self._open_mods)
+        self.input_handler.register_action_callback("open_discord_logs", self._open_discord_logs)
         self.input_handler.register_action_callback("resize", self._handle_resize)
         self.input_handler.register_action_callback("toggle_mod", self._toggle_mod)
         self.input_handler.register_action_callback("add_mod", self._prompt_add_mod)
@@ -180,6 +181,43 @@ class TUIApp:
         self.state_manager.state.ui_state.mods = mods
         self.state_manager.state.ui_state.mods_viewer_active = True
         self.state_manager.state.ui_state.selected_mod_idx = 0
+
+    def _open_discord_logs(self) -> None:
+        """Open Discord bot logs viewer."""
+        from utils.logger import discord_logger
+        from pathlib import Path
+
+        # Read from the actual log file
+        log_file_path = discord_logger.get_log_file_path()
+        log_content = []
+
+        if log_file_path and Path(log_file_path).exists():
+            try:
+                with open(log_file_path, 'r') as f:
+                    # Read all lines and take last 500
+                    lines = f.readlines()
+                    log_content = [line.rstrip('\n') for line in lines[-500:]]
+            except Exception as e:
+                log_content = [f"Error reading log file: {e}"]
+
+        if not log_content:
+            log_content = [
+                "No Discord bot logs available yet.",
+                "",
+                "The Discord bot will log activity here including:",
+                "  - Bot startup and initialization",
+                "  - Command executions",
+                "  - Server control operations",
+                "  - Chat activity detection",
+                "  - Errors and warnings",
+                "",
+                f"Log file: {log_file_path or 'Not configured'}"
+            ]
+
+        self.state_manager.state.ui_state.log_content = log_content
+        self.state_manager.state.ui_state.discord_logs_viewer_active = True
+        # Start at the bottom to show most recent logs
+        self.state_manager.state.ui_state.log_scroll_pos = max(0, len(log_content) - 20)
 
     def _handle_resize(self) -> None:
         """Handle terminal resize."""
