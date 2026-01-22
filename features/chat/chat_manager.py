@@ -50,6 +50,16 @@ class ChatManager:
         return ChatManager.send_command(shard_name, command)
 
     @staticmethod
+    def send_system_message(shard_name: str, message: str) -> tuple[bool, str]:
+        """Sends a chat message using TheNet:SystemMessage command."""
+        if shard_name != "Master":
+            return False, "Chat messages can only be sent to the 'Master' shard."
+
+        command = f'TheNet:SystemMessage("{message}")'
+        return ChatManager.send_command(shard_name, command)
+
+
+    @staticmethod
     def send_command(shard_name: str, command: str) -> tuple[bool, str]:
         """Sends a command to the specified shard's console."""
         # Allow commands to all shards (not just Master) for status polling

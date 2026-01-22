@@ -74,6 +74,12 @@ class ManagerService:
 
         return ChatManager.send_chat_message(shard_name, message)
 
+    def send_system_message(self, message: str) -> Tuple[bool, str]:
+        """Sends a chat message using TheNet:SystemMessage command."""
+        from features.chat.chat_manager import ChatManager
+
+        return ChatManager.send_system_message("Master", message)
+
     def get_server_status(self, shard_name: str = "Master") -> Dict:
         """Gets server status information."""
         from features.status.status_manager import StatusManager
@@ -91,15 +97,12 @@ class ManagerService:
         """Lazy initialization of Discord service."""
         if self._discord_service is None:
             from services.discord_service import DiscordService
-            print("Initializing Discord service...")
             self._discord_service = DiscordService(self)
         return self._discord_service
 
     def start_discord_bot(self):
         """Start the Discord bot if enabled."""
-        print("Starting Discord bot checking if it's enabled...")
         if self.discord_service.is_enabled():
-            print("Discord bot is enabled, starting")
             self.discord_service.start()
 
     def stop_discord_bot(self):
